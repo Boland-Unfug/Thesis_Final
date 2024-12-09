@@ -1,2 +1,54 @@
 # Thesis_Final
-pogging out fr fr
+core libraries needed:
+c++ environment https://cmake.org/ https://gcc.gnu.org/gcc-13/
+*might not need to seperately install cmake, gcc does that for you
+vcpkg manager very good! you can download the c++ libraries needed from their home page.
+c++ libraries: 
+box2d https://github.com/erincatto/box2d/releases/tag/v2.4.2 https://box2d.org/doc_version_2_4/
+sfml https://www.sfml-dev.org/
+Build environment
+???
+python environment (I advise using pip)
+pandas, numpy, matplotlib
+
+run the program
+# explain commands
+# args that only effect configuration
+manual
+reset_constants
+tactics
+maneuvers
+no_draw
+no_text
+no_play
+no_cache
+verbose
+pause_on_simulation_start
+seed
+num_agents
+agent_radius
+max_rounds
+gravity_x
+gravity_y
+time_step
+velocity_iterations
+position_iterations
+density
+friction
+restitution
+start_position_x
+start_position_y
+start_force_x
+start_force_y
+speed_cap
+acceleration_cap
+window_x
+window_y
+framerate
+
+# explain file structure
+ConfigManager
+Decode
+Graph
+main.cpp
+supporting files
