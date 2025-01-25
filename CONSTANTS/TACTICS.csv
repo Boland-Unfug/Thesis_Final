@@ -1,0 +1,6 @@
+tactics,tactic_colors,tactic_colors_binary
+Cooperate,"[0, 255, 0, 255]",16711935
+Defect,"[255, 0, 0, 255]",4278190335
+TitForTat,"[0, 0, 255, 255]",65535
+NaiveTitForTat,"[128, 0, 0, 255]",2147483903
+RandomChoice,"[0, 128, 0, 255]",8388863

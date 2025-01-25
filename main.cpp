@@ -23,6 +23,7 @@ b2Body *CreateWall(b2World *world, const b2Vec2 &position, const b2Vec2 &size)
     box.SetAsBox(size.x / 2, size.y / 2);
 
     body->CreateFixture(&box, 0.0f);
+    std::cout<<body<<std::endl;
 
     return body;
 }
@@ -58,6 +59,12 @@ b2Vec2 ApplyMovementCap(b2Vec2 force, float movement_cap)
         force *= movement_cap;
     }
     return force;
+}
+
+double clockToMilliseconds(clock_t ticks)
+{
+    // units/(units/time) => time (seconds) * 1000 = milliseconds
+    return (ticks / (double)CLOCKS_PER_SEC) * 1000.0;
 }
 
 int main()
@@ -155,7 +162,7 @@ int main()
         {
             temp_agent_radius = std::stof(setting_value);
         }
-        else if (setting == "max_rounds")
+        else if (setting == "rounds")
         {
             temp_max_rounds = std::stoi(setting_value);
         }
@@ -306,23 +313,28 @@ int main()
         {{5, 0}, {1, 1}}};
 
     std::unordered_map<uint64_t, uint8_t> history;
+    std::vector<std::vector<bool>> collisions(NUMAGENTS, std::vector<bool>(NUMAGENTS, 0));
 
     sf::Font font;
     if (!font.loadFromFile("Roboto-Bold.ttf"))
     {
         std::cout << "failed to load font" << std::endl;
     }
+    sf::Text text;
+    sf::Text frame_rate_text;
+    sf::Text frame_time_text;
+    sf::Text round_text;
 
-    sf::RenderWindow window(sf::VideoMode(WINDOWX * SCALE, WINDOWY * SCALE),"");
+    sf::RenderWindow window(sf::VideoMode(WINDOWX * SCALE, WINDOWY * SCALE), "");
     window.setFramerateLimit(FRAMERATE);
 
     b2World *world = new b2World(GRAVITY);
 
     // create walls
-    CreateWall(world, b2Vec2(0.0f, 0.0f), b2Vec2(WINDOWX * 2, 1.0f));
-    CreateWall(world, b2Vec2(0.0f, 0.0f), b2Vec2(1.0f, WINDOWY * 2));
-    CreateWall(world, b2Vec2(0.0f, WINDOWY), b2Vec2(WINDOWX * 2, 1.0f));
-    CreateWall(world, b2Vec2(WINDOWX, 0.0f), b2Vec2(1.0f, WINDOWY * 2));
+    b2Body* top_wall = CreateWall(world, b2Vec2(0.0f, 0.0f), b2Vec2(WINDOWX * 2, 1.0f));
+    b2Body* left_wall = CreateWall(world, b2Vec2(0.0f, 0.0f), b2Vec2(1.0f, WINDOWY * 2));
+    b2Body* bottom_wall = CreateWall(world, b2Vec2(0.0f, WINDOWY), b2Vec2(WINDOWX * 2, 1.0f));
+    b2Body* right_wall = CreateWall(world, b2Vec2(WINDOWX, 0.0f), b2Vec2(1.0f, WINDOWY * 2));
 
     std::cout << "Game set!" << std::endl
               << "Creating agents..." << std::endl;
@@ -406,6 +418,14 @@ int main()
         {
             maneuvers.push_back(new LossFlee());
         }
+        else if (maneuver == "Smart")
+        {
+            maneuvers.push_back(new Smart());
+        }
+        else if (maneuver == "Sum")
+        {
+            maneuvers.push_back(new Sum());
+        }
         else
         {
             std::cerr << "Invalid maneuver type: " << maneuver << std::endl;
@@ -448,42 +468,31 @@ int main()
     std::cout << "Agents created!" << std::endl
               << "Adding agents to game..." << std::endl;
 
+    clock_t delta_time = 0;
+    unsigned int frames = 0;
+    double framerate = 30;
+    double average_frame_time_milliseconds = 33.333;
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            switch (event.type)
-            {
-            case sf::Event::Closed:
-                window.close();
-                break;
-            case sf::Event::KeyPressed:
-                if (event.key.code == sf::Keyboard::Space)
-                {
-                    paused = !paused;
-                }
-                if (event.key.code == sf::Keyboard::Escape)
-                {
-                    window.close();
-                }
-            }
-        }
-
-        if (round > MAXROUNDS)
-        {
-            window.close();
-        }
-        if (round == NUMAGENTS)
-        {
-            std::cout << "Agents added to game." << std::endl
-                      << "Playing game..." << std::endl;
-        }
+        clock_t beginFrame = clock();
 
         if (paused == false)
         {
+            if (VERBOSE == 1){
+                std::cout <<"ROUND:" <<round<<std::endl;
+            }
+            if (round > MAXROUNDS)
+            {
+                window.close();
+            }
 
             world->Step(TIMESTEP, VELOCITYITERATIONS, POSITIONITERATIONS);
+
+            if (round == NUMAGENTS)
+            {
+                std::cout << "Agents added to game." << std::endl
+                          << "Playing game..." << std::endl;
+            }
 
             if (round < NUMAGENTS) // trickle effect
             {
@@ -494,7 +503,7 @@ int main()
 
             if (PLAY == true && round > NUMAGENTS) // needed for the trickle effect to not bias results
             {
-                std::vector<std::vector<bool>> collisions(NUMAGENTS, std::vector<bool>(NUMAGENTS, 0));
+                
                 b2Contact *contact = world->GetContactList(); // Get the head of the contact list
 
                 while (contact != nullptr)
@@ -505,13 +514,24 @@ int main()
                     b2Body *body_b = fixture_b->GetBody();
                     uint16_t id_1 = body_a->GetUserData().pointer;
                     uint16_t id_2 = body_b->GetUserData().pointer;
+                    
+                    bool wall_collide = 0;
+                    if (body_a == top_wall || body_b == top_wall ||
+                        body_a == left_wall || body_b == left_wall ||
+                        body_a == bottom_wall || body_b == bottom_wall ||
+                        body_a == right_wall || body_b == right_wall){
+                        // std::cout<<"Colliding with top wall"<<std::endl;
+                        wall_collide = 1;
+                    }
 
                     // Check if the contact is actually enabled (true collision) and not already played
-                    if (collisions[id_1][id_2] == 0 && contact->IsTouching())
+                    if (collisions[id_1][id_2] == 0 && collisions[id_1][id_2] == 0 && contact->IsTouching() && wall_collide == 0)
                     {
                         // add the collision to the list
                         collisions[id_1][id_2] = 1;
+                        collisions[id_2][id_1] = 1;
                         // Access the contact manifold to get the contact points
+                        // Might be able to get away with relative positions and thus not need world positions
                         b2WorldManifold world_manifold;
                         contact->GetWorldManifold(&world_manifold);
                         b2Vec2 contactPoint = world_manifold.points[0]; // I can do this because they are all circles
@@ -519,11 +539,23 @@ int main()
                         b2Vec2 id_1_velocity = body_a->GetLinearVelocity();
                         b2Vec2 id_2_position = body_b->GetPosition();
                         b2Vec2 id_2_velocity = body_b->GetLinearVelocity();
-
+                        if (VERBOSE == 1)
+                        {
+                            std::cout << "Agent 1: " << id_1
+                                      << " colliding at: " << id_1_position.x << "," << id_1_position.y << " with velocity " << id_1_velocity.x << "," << id_1_velocity.y << std::endl;
+                            std::cout << "Agent 2: " << id_2
+                                      << " colliding at: " << id_2_position.x << "," << id_2_position.y << " with velocity " << id_2_velocity.x << "," << id_2_velocity.y << std::endl;
+                        };
                         // b2Vec2 contactPoint, b2Vec2 playerPoint, b2Vec2 oppPoint, b2Vec2 playerVelocity, b2Vec2 oppVelocity, uint16_t opponent
                         //  this constitutes playing the game
-                        bool choice_1 = tactics[id_1]->doTactic(contactPoint, id_1_position, id_2_position, id_1_velocity, id_2_velocity, id_2);
-                        bool choice_2 = tactics[id_2]->doTactic(contactPoint, id_2_position, id_1_position, id_2_velocity, id_1_velocity, id_1);
+                        bool choice_1 = tactics[id_1]->doTactic(id_2);
+                        bool choice_2 = tactics[id_2]->doTactic(id_1);
+                        
+                        if (VERBOSE == 1)
+                        {
+                            std::cout << "Agent 1 used: " << tactic_names[id_1] << " to play: " << (choice_1 ? "Defect" : "Cooperate") << std::endl;
+                            std::cout << "Agent 2 used: " << tactic_names[id_2] << " to play: " << (choice_2 ? "Defect" : "Cooperate") << std::endl;
+                        };
 
                         // bool youchoice, bool oppchoice, uint16_t p1, uint16_t p2
                         tactics[id_1]->updateTactic(choice_1, choice_2, contactPoint, id_1_position, id_2_position, id_1_velocity, id_2_velocity, id_2);
@@ -557,6 +589,7 @@ int main()
                     // Move to the next contact in the list
                     contact = contact->GetNext();
                 }
+                std::fill(collisions.begin(), collisions.end(), std::vector<bool>(NUMAGENTS, 0));
 
                 // do the maneuvers
                 for (int i = 0; i < NUMAGENTS; i++) // going to test agents moving each round first
@@ -598,36 +631,84 @@ int main()
 
                         if (TEXT == true)
                         {
-
-                            sf::Text text;
-
                             int text_size = radius * SCALE;
 
-                            // select the font
-                            text.setFont(font); // font is a sf::Font
-
-                            // set the string to display
                             text.setString(std::to_string(i));
+                            frame_rate_text.setString(std::to_string(framerate));
+                            frame_time_text.setString(std::to_string(average_frame_time_milliseconds));
+                            round_text.setString(std::to_string(round - NUMAGENTS));
+
+                            text.setFont(font);            // font is a sf::Font
+                            frame_rate_text.setFont(font); // font is a sf::Font
+                            frame_time_text.setFont(font); // font is a sf::Font
+                            round_text.setFont(font);
 
                             // set the character size
-                            text.setCharacterSize(text_size); // in pixels, not points!
+                            text.setCharacterSize(text_size);                  // in pixels, not points!
+                            frame_rate_text.setCharacterSize(text_size * 1.5); // in pixels, not points!
+                            frame_time_text.setCharacterSize(text_size * 1.5); // in pixels, not points!
+                            round_text.setCharacterSize(text_size * 1.5);
 
                             // set the color
                             text.setFillColor(sf::Color::Black);
+                            frame_rate_text.setFillColor(sf::Color::White);
+                            frame_time_text.setFillColor(sf::Color::White);
+                            round_text.setFillColor(sf::Color::White);
 
                             // set the position to the agents position, with an offset of the textsize to fit the shape
                             text.setPosition(SCALE * bodies[i]->GetPosition().x - text_size * 9 / 10, SCALE * bodies[i]->GetPosition().y - text_size / 2);
+                            frame_rate_text.setPosition(10, text_size);
+                            frame_time_text.setPosition(10, text_size * 2.5);
+                            round_text.setPosition(10, text_size);
 
                             // inside the main loop, between window.clear() and window.display()
                             window.draw(text);
+                            // window.draw(frame_rate_text);
+                            // window.draw(frame_time_text);
+                            window.draw(round_text);
                         }
                     }; // lets me do the feed in effect
                 }
 
                 window.display();
             }
-
             round++;
+        }
+
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            switch (event.type)
+            {
+            case sf::Event::Closed:
+                window.close();
+                break;
+            case sf::Event::KeyPressed:
+                if (event.key.code == sf::Keyboard::Space)
+                {
+                    paused = !paused;
+                }
+                if (event.key.code == sf::Keyboard::Escape)
+                {
+                    window.close();
+                }
+            }
+        }
+
+        clock_t endFrame = clock();
+
+        delta_time += endFrame - beginFrame;
+        frames++;
+
+        // if you really want FPS
+        if (clockToMilliseconds(delta_time) > 1000.0)
+        {                                                       // every second
+            framerate = (double)frames * 0.5 + framerate * 0.5; // more stable
+            frames = 0;
+            delta_time -= CLOCKS_PER_SEC;
+            average_frame_time_milliseconds = 1000.0 / (framerate == 0 ? 0.001 : framerate);
+
+            // std::cout<<"CPU time was:"<<average_frame_time_milliseconds<<std::endl;
         }
     }
 
@@ -648,6 +729,9 @@ int main()
         // close the files
         history_file.close();
 
+        std::cout << "History caching finished!" << std::endl
+                  << "Analyzing results..." << std::endl;
+
         std::string decode = "cd .. && py Decode.py --dir " + SAVELOCATION + (VERBOSE ? " --verbose" : "");
 
         const char *command = decode.c_str();
@@ -656,11 +740,11 @@ int main()
 
         if (result == 0)
         {
-            std::cout << "Python script executed successfully.\n";
+            std::cout << "decoding of history complete.\n";
         }
         else
         {
-            std::cerr << "Failed to execute Python script.\n";
+            std::cerr << "Failed to complete decoding script.\n";
         }
 
         std::string graph;
@@ -673,11 +757,11 @@ int main()
 
         if (result == 0)
         {
-            std::cout << "Python script executed successfully.\n";
+            std::cout << "graphing of history complete.\n";
         }
         else
         {
-            std::cerr << "Failed to execute Python script.\n";
+            std::cerr << "Failed to complete graphing script.\n";
         }
     }
     return 0;

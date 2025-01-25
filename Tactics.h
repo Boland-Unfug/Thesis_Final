@@ -10,7 +10,7 @@ class Defect : public Tactic // represented by 'd'
 {
 public:
     Defect() = default;
-    bool doTactic( b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) const override { return 1; };    // also sadly have to hand opponent in
+    bool doTactic(uint16_t opponent) const override { return 1; };    // also sadly have to hand opponent in
     void updateTactic(bool player_choice, bool opponent_choice, b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) override {}; // I think useless? but necessary?
 };
 
@@ -18,7 +18,7 @@ class Cooperate : public Tactic // represented by 'c'
 {
 public:
     Cooperate() = default;
-    bool doTactic( b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) const override { return 0; };    // also sadly have to hand opponent in
+    bool doTactic(uint16_t opponent) const override { return 0; };    // also sadly have to hand opponent in
     void updateTactic(bool player_choice, bool opponent_choice, b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) override {}; // I think useless? but necessary?
 };
 
@@ -32,7 +32,7 @@ public:
             choices.push_back(false);
         }
     }
-    bool doTactic( b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) const override
+    bool doTactic(uint16_t opponent) const override
     {
         return this->choices[opponent];
     };
@@ -50,7 +50,7 @@ public:
     
     NaiveTitForTat() = default;
     // I am about to do a coding sin TODO fix this later
-    bool doTactic( b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) const override
+    bool doTactic(uint16_t opponent) const override
     {
         return this->choice;
     };
@@ -66,7 +66,7 @@ class RandomChoice : public Tactic
 {
 public:
     RandomChoice() = default;
-    bool doTactic( b2Vec2 contact_point, b2Vec2 player_point, b2Vec2 opponent_point, b2Vec2 player_velocity, b2Vec2 opponent_velocity, uint16_t opponent) const override
+    bool doTactic(uint16_t opponent) const override
     {
         return rand() % 2;
     };

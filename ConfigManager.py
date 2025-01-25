@@ -22,7 +22,7 @@ def positiveFraction(value):
         fvalue = float(value)
     except ValueError:
         raise argparse.ArgumentTypeError(f"{value} is an invalid float. It must be a fraction between 0 and 1.")
-    if not (0 < fvalue <= 1):
+    if not (0 <= fvalue <= 1):
         raise argparse.ArgumentTypeError(f"{value} must be between 0 and 1, inclusive.")
     return fvalue
 
@@ -52,17 +52,18 @@ parser.add_argument('--no_draw', action='store_true', help='Render the simulatio
 parser.add_argument('--no_text', action='store_true', help='Number the agents?')
 parser.add_argument('--no_play', action='store_true', help='Have agents play games?')
 parser.add_argument('--no_cache', action='store_true', help='Save the data to files?')
+parser.add_argument('--no_run', action='store_true', help='Run the simulation?')
 parser.add_argument('--verbose', action='store_true', help="maximum terminal output")
 parser.add_argument('--pause_on_start', action='store_true', help='Have the simulation start paused')
 parser.add_argument('--seed', type=int, default=0, help='Set the seed.')
 parser.add_argument('--num_agents', type=positiveInt, default=250, help='Number of agents (positive integer, 1000 max)')
 parser.add_argument('--agent_radius', type=positiveFraction, default=0.5, help='Agent radius (fraction between 0 and 1, ideal range 0.1 to 0.5 recommended)')
-parser.add_argument('--max_rounds', type=positiveInt, default=10000, help='Max rounds (positive integer, 1 billion max)')
+parser.add_argument('--rounds', type=positiveInt, default=10000, help='Max rounds (positive integer, 1 billion max)')
 parser.add_argument('--gravity_x', type=positiveFloat, default=0.0, help='Gravity x (positive float recommended)')
 parser.add_argument('--gravity_y', type=positiveFloat, default=0.0, help='Gravity y (positive float recommended)')
 parser.add_argument('--time_step', type=positiveFloat, default=1.0, help='Time steps per frame (positive float recommended)')
-parser.add_argument('--velocity_iterations', type=positiveInt, default=6, help='Velocity iterations (positive integer recommended)')
-parser.add_argument('--position_iterations', type=positiveInt, default=2, help='Position iterations (positive integer recommended)')
+parser.add_argument('--velocity_iterations', type=positiveInt, default=1, help='Velocity iterations (positive integer required)')
+parser.add_argument('--position_iterations', type=positiveInt, default=1, help='Position iterations (positive integer required)')
 parser.add_argument('--density', type=positiveFloat, default=1.0, help='Density (positive float recommended)')
 parser.add_argument('--friction', type=positiveFraction, default=0.3, help='Friction (fraction between 0 and 1 recommended)')
 parser.add_argument('--restitution', type=positiveFraction, default=0.5, help='Restitution (fraction between 0 and 1 recommended)')
@@ -108,8 +109,8 @@ def list_to_single_int(color_list):
 
 if ((args.reset_constants == True) or (os.path.exists('CONSTANTS/MANEUVERS.csv') == False)):
     MANEUVER_CONSTANTS = pd.DataFrame({
-    "maneuvers": ['Up', 'Down', 'Left', 'Right', 'RandomMove','Still', 'Chase', 'Flee', 'WinChase', 'LossFlee'],
-    "maneuver_colors": [[50, 50, 50,255], [100, 100, 100,255], [150, 150, 150,255], [200,200,200,255], [250, 250, 250,255], [0, 0, 0,255], [255, 0, 255,255], [0, 255, 255,255], [128, 0, 128,255], [0, 128, 128, 255]]
+    "maneuvers": ['Up', 'Down', 'Left', 'Right', 'RandomMove','Still', 'Chase', 'Flee', 'WinChase', 'LossFlee', 'Smart', 'Sum'],
+    "maneuver_colors": [[50, 50, 50,255], [100, 100, 100,255], [150, 150, 150,255], [200,200,200,255], [0, 0, 0,255], [250, 250, 250,255], [255, 0, 255,255], [0, 255, 255,255], [128, 0, 128,255], [0, 128, 128, 255], [255, 255, 0, 255], [128, 128, 0, 255]]
     })
     MANEUVER_CONSTANTS['maneuver_colors_binary'] = MANEUVER_CONSTANTS['maneuver_colors'].apply(
     lambda x: int.from_bytes(bytes(x), byteorder='big')
@@ -150,6 +151,7 @@ def get_strategies(args, MANEUVER_CONSTANTS, TACTIC_CONSTANTS):
 
 tactics, maneuvers = get_strategies(args, MANEUVER_CONSTANTS, TACTIC_CONSTANTS)
 
+# minor change to make here - ensure that each agent appears at least once, before sampling
 agent_maneuvers = maneuvers.sample(args.num_agents, replace=True, random_state=args.seed, ignore_index=True)
 agent_tactics = tactics.sample(args.num_agents, replace=True, random_state=args.seed + 1, ignore_index=True)
 
@@ -158,13 +160,14 @@ agent.index.name = 'agent_id'
 agent.to_csv("Configs/Agents.csv", sep=';')
 
 
-args_dataframe = args_dataframe.drop(['reset_constants', 'manual', 'tactics', 'maneuvers'], axis=0)
+args_dataframe = args_dataframe.drop(['reset_constants', 'manual', 'tactics', 'maneuvers', 'no_run'], axis=0)
 args_dataframe.index.name = 'setting'
 args_dataframe = args_dataframe.rename(columns={0: 'value'})
 args_dataframe.to_csv("Configs/Settings.csv", sep=';')
 
-import subprocess
-os.chdir("./build")
-subprocess.run(["cmake", "--build",  "."])
-subprocess.run(["Thesis.exe"])
-print("finished")
+if (args.no_run == False):
+    import subprocess
+    os.chdir("./build")
+    subprocess.run(["cmake", "--build",  "."])
+    subprocess.run(["Thesis.exe"])
+    print("finished")

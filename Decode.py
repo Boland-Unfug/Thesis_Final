@@ -42,7 +42,7 @@ def decode(history, settings):
 def get_scores(decoded_history, reward_matrix, settings):
     # Constants for the number of agents and maximum number of rounds
     NUM_AGENTS = int(settings.loc[settings['setting'] == 'num_agents', 'value'].values[0])
-    MAX_ROUNDS = int(settings.loc[settings['setting'] == 'max_rounds', 'value'].values[0]-1)  # Replace with the maximum round number
+    MAX_ROUNDS = int(settings.loc[settings['setting'] == 'rounds', 'value'].values[0]-1)  # Replace with the maximum round number
 
     # Generate scores for both agents
     score = pd.DataFrame(
@@ -205,7 +205,7 @@ history = pd.read_csv(datadir + "Raw_History.csv", sep=';')
 
 settings = pd.read_csv(datadir + "settings.csv", sep=';')
 
-reward_matrix=np.array([[[3,3],[0,5]],[[5,0],[1,1]]])
+reward_matrix=np.array([[[3,3],[-5,5]],[[5,-5],[-3,-3]]])
 clean_history, score_history = clean_data(agents, history, settings, reward_matrix)
 clean_history.to_csv(datadir + "Clean_History.csv", index=False)
 score_history.to_csv(datadir + "Score_History.csv", index=False)
